@@ -255,6 +255,7 @@ public final class MainActivity extends ComponentActivity {
         @JavascriptInterface public void resume() {
             runOnUiThread(() -> {
                 if (cameraPaused) {
+                    barcodeHandled.set(false);
                     cameraPaused = false;
                     start();
                 }
