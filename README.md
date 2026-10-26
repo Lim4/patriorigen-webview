@@ -41,7 +41,7 @@ Consulta la [política de privacidad de Patriorigen](https://patriorigen.es/priv
 
 ### Desde GitHub Actions
 
-El repositorio compila el APK en cada cambio y permite iniciar una compilación manual desde [Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml). Descarga el artefacto **Patriorigen-WebView-debug** de una ejecución completada correctamente.
+El flujo de GitHub Actions genera un APK de depuración en los cambios que activan la compilación y permite iniciarla manualmente desde [Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml). Descarga el artefacto **Patriorigen-WebView-debug** de una ejecución completada correctamente.
 
 ### En local
 
