@@ -328,6 +328,10 @@ public final class MainActivity extends ComponentActivity {
 
     private void startCamera() {
         if (cameraStarted || cameraPaused) return;
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) return;
+        getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(KEY_PERMISSION_DECLINED, false).apply();
         cameraStarted = true;
         ListenableFuture<ProcessCameraProvider> future = ProcessCameraProvider.getInstance(this);
         future.addListener(() -> {
@@ -473,6 +477,16 @@ public final class MainActivity extends ComponentActivity {
             if (!shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
                 showCameraSettingsDialog();
             }
+        }
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(KEY_PERMISSION_DECLINED, false).apply();
+            permissionDenied = false;
+            if (pageReady && !cameraStarted && !cameraPaused) startCamera();
         }
     }
     @Override public void onBackPressed() {
