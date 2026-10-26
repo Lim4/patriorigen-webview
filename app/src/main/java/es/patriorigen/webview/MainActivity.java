@@ -163,8 +163,7 @@ public final class MainActivity extends ComponentActivity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                return !"https".equalsIgnoreCase(uri.getScheme())
-                        && !"http".equalsIgnoreCase(uri.getScheme());
+                return !"https".equalsIgnoreCase(uri.getScheme());
             }
 
             @Override
