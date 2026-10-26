@@ -1,12 +1,13 @@
 package es.patriorigen.webview;
 
-import android.Manifest;
 import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.pm.PackageManager;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.webkit.PermissionRequest;
+import android.view.Gravity;
+import android.view.ViewGroup;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -14,39 +15,47 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.net.http.SslError;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.Toast;
 
-import java.util.ArrayList;
-import java.util.List;
+import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
-    private static final String CAMERA_TUNING_SCRIPT =
-            "(function(){"
-                    + "if(window.__patriorigenCameraTuningInstalled)return;"
-                    + "window.__patriorigenCameraTuningInstalled=true;"
-                    + "var tunedTracks=new WeakSet();"
-                    + "window.setInterval(function(){"
-                    + "var video=document.getElementById('video');"
-                    + "var tracks=video&&video.srcObject&&video.srcObject.getVideoTracks?video.srcObject.getVideoTracks():[];"
-                    + "if(!tracks.length)return;"
-                    + "var track=tracks[0];if(tunedTracks.has(track))return;tunedTracks.add(track);"
-                    + "var constraints={width:{ideal:1280,max:1280},height:{ideal:720,max:720},frameRate:{ideal:30,max:30}};"
-                    + "try{var caps=track.getCapabilities?track.getCapabilities():{};"
-                    + "if(caps.focusMode&&caps.focusMode.indexOf('continuous')!==-1)"
-                    + "constraints.advanced=[{focusMode:'continuous'}];}catch(e){}"
-                    + "if(track.applyConstraints)track.applyConstraints(constraints).catch(function(){});"
-                    + "},250);"
-                    + "})();";
-    private static final int MEDIA_PERMISSION_REQUEST = 4101;
+    private static final int NATIVE_SCAN_REQUEST = 5102;
+    private static final String HOME_URL = "https://patriorigen.es";
+
     private WebView webView;
-    private PermissionRequest pendingWebPermission;
-    private String[] pendingAndroidPermissions;
+    private Button scanButton;
+    private boolean initialScannerLaunched;
+    private boolean pageReady;
+    private String pendingBarcode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        FrameLayout root = new FrameLayout(this);
         webView = new WebView(this);
-        setContentView(webView);
+        root.addView(webView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
+        scanButton = new Button(this);
+        scanButton.setText("Escanear con lente principal");
+        scanButton.setTextColor(Color.WHITE);
+        GradientDrawable buttonBackground = new GradientDrawable();
+        buttonBackground.setColor(0xFFB30920);
+        buttonBackground.setCornerRadius(dp(24));
+        scanButton.setBackground(buttonBackground);
+        scanButton.setElevation(dp(8));
+        scanButton.setOnClickListener(view -> launchNativeScanner());
+
+        FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(52), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        buttonParams.bottomMargin = dp(84);
+        root.addView(scanButton, buttonParams);
+        setContentView(root);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -63,12 +72,23 @@ public final class MainActivity extends Activity {
                 super.onPageFinished(view, url);
                 Uri uri = Uri.parse(url);
                 String host = uri.getHost();
-                if ("https".equalsIgnoreCase(uri.getScheme())
-                        && host != null
-                        && (host.equalsIgnoreCase("patriorigen.es")
-                            || host.equalsIgnoreCase("www.patriorigen.es"))) {
-                    view.evaluateJavascript(CAMERA_TUNING_SCRIPT, null);
-                }
+                if (!"https".equalsIgnoreCase(uri.getScheme())
+                        || host == null
+                        || !(host.equalsIgnoreCase("patriorigen.es")
+                            || host.equalsIgnoreCase("www.patriorigen.es"))) return;
+
+                pageReady = true;
+                view.evaluateJavascript(
+                        "(function(){"
+                                + "var b=document.getElementById('startBtn');if(b)b.style.display='none';"
+                                + "var s=document.getElementById('cameraStatus');if(s)s.style.display='none';"
+                                + "var p=document.getElementById('placeholder');"
+                                + "if(p){var a=p.querySelector('strong'),c=p.querySelector('span');"
+                                + "if(a)a.textContent='Cámara principal';"
+                                + "if(c)c.textContent='Pulsa «Escanear con lente principal» para leer el código';}"
+                                + "})();",
+                        null);
+                deliverPendingBarcode();
             }
 
             @Override
@@ -84,143 +104,60 @@ public final class MainActivity extends Activity {
         });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
-            public void onPermissionRequest(PermissionRequest request) {
-                handleWebPermission(request);
-            }
-
-            @Override
-            public void onPermissionRequestCanceled(PermissionRequest request) {
-                if (pendingWebPermission == request) {
-                    pendingWebPermission = null;
-                    pendingAndroidPermissions = null;
-                }
+            public void onPermissionRequest(android.webkit.PermissionRequest request) {
+                // Camera access is handled by CameraX in ScannerActivity.
+                request.deny();
             }
         });
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
-            webView.loadUrl("https://patriorigen.es");
-        }
-    }
-
-    private void handleWebPermission(PermissionRequest request) {
-        Uri origin = request.getOrigin();
-        String host = origin.getHost();
-        if (!"https".equalsIgnoreCase(origin.getScheme())
-                || host == null
-                || !(host.equalsIgnoreCase("patriorigen.es")
-                    || host.equalsIgnoreCase("www.patriorigen.es"))) {
-            request.deny();
-            return;
+            webView.loadUrl(HOME_URL);
         }
 
-        List<String> resources = new ArrayList<>();
-        List<String> androidPermissions = new ArrayList<>();
-        for (String resource : request.getResources()) {
-            if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
-                resources.add(resource);
-                androidPermissions.add(Manifest.permission.CAMERA);
-            } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
-                resources.add(resource);
-                androidPermissions.add(Manifest.permission.RECORD_AUDIO);
-            } else {
-                request.deny();
-                return;
+        webView.postDelayed(() -> {
+            if (!initialScannerLaunched) {
+                initialScannerLaunched = true;
+                launchNativeScanner();
             }
-        }
-        if (resources.isEmpty()) {
-            request.deny();
-            return;
-        }
-
-        pendingWebPermission = request;
-        pendingAndroidPermissions = androidPermissions.toArray(new String[0]);
-        boolean needsRuntimePermission = false;
-        for (String permission : pendingAndroidPermissions) {
-            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-                needsRuntimePermission = true;
-                break;
-            }
-        }
-        if (needsRuntimePermission) {
-            requestPermissions(pendingAndroidPermissions, MEDIA_PERMISSION_REQUEST);
-        } else {
-            askWebPermission(request, resources.toArray(new String[0]), host);
-        }
+        }, 1800);
     }
 
-    private void askWebPermission(
-            PermissionRequest request, String[] resources, String host) {
-        String description;
-        boolean camera = contains(resources, PermissionRequest.RESOURCE_VIDEO_CAPTURE);
-        boolean microphone = contains(resources, PermissionRequest.RESOURCE_AUDIO_CAPTURE);
-        if (camera && microphone) description = "la cámara y el micrófono";
-        else if (camera) description = "la cámara";
-        else description = "el micrófono";
-
-        new AlertDialog.Builder(this)
-                .setTitle("Permitir acceso")
-                .setMessage(host + " quiere usar " + description + ".")
-                .setPositiveButton("Permitir", (dialog, which) -> {
-                    if (pendingWebPermission == request) {
-                        request.grant(resources);
-                        clearPendingPermission();
-                    }
-                })
-                .setNegativeButton("Rechazar", (dialog, which) -> {
-                    request.deny();
-                    clearPendingPermission();
-                })
-                .setOnCancelListener(dialog -> {
-                    request.deny();
-                    clearPendingPermission();
-                })
-                .show();
-    }
-
-    private static boolean contains(String[] values, String target) {
-        for (String value : values) if (target.equals(value)) return true;
-        return false;
-    }
-
-    private void clearPendingPermission() {
-        pendingWebPermission = null;
-        pendingAndroidPermissions = null;
+    private void launchNativeScanner() {
+        if (isFinishing()) return;
+        try {
+            startActivityForResult(
+                    new Intent(this, ScannerActivity.class), NATIVE_SCAN_REQUEST);
+        } catch (RuntimeException error) {
+            Toast.makeText(this, "No se pudo abrir la cámara principal.", Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
-    public void onRequestPermissionsResult(
-            int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode != MEDIA_PERMISSION_REQUEST) return;
-
-        PermissionRequest request = pendingWebPermission;
-        String[] requested = pendingAndroidPermissions;
-        if (request == null || requested == null) return;
-
-        boolean granted = grantResults.length == requested.length;
-        for (int result : grantResults) {
-            if (result != PackageManager.PERMISSION_GRANTED) granted = false;
-        }
-        if (granted) {
-            Uri origin = request.getOrigin();
-            askWebPermission(request, resourcesFor(request), origin.getHost());
-        } else {
-            request.deny();
-            clearPendingPermission();
-        }
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != NATIVE_SCAN_REQUEST || resultCode != RESULT_OK || data == null) return;
+        pendingBarcode = data.getStringExtra(ScannerActivity.EXTRA_BARCODE);
+        deliverPendingBarcode();
     }
 
-    private static String[] resourcesFor(PermissionRequest request) {
-        List<String> allowed = new ArrayList<>();
-        for (String resource : request.getResources()) {
-            if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)
-                    || PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
-                allowed.add(resource);
-            }
-        }
-        return allowed.toArray(new String[0]);
+    private void deliverPendingBarcode() {
+        if (!pageReady || pendingBarcode == null || webView == null) return;
+        String code = pendingBarcode;
+        pendingBarcode = null;
+        String script = "(function(){"
+                + "var input=document.getElementById('barcodeInput');"
+                + "var form=document.getElementById('manualForm');"
+                + "if(!input||!form)return;"
+                + "input.value=" + JSONObject.quote(code) + ";"
+                + "form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));"
+                + "})();";
+        webView.evaluateJavascript(script, null);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     @Override
@@ -237,7 +174,6 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        clearPendingPermission();
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();
