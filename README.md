@@ -33,11 +33,11 @@ Consulta la [política de privacidad de Patriorigen](https://patriorigen.es/priv
 
 ### Desde GitHub Actions
 
-El flujo de GitHub Actions genera un APK de depuración en los cambios que activan la compilación y permite iniciarla manualmente desde [Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml). Descarga el artefacto **Patriorigen-WebView-debug** de una ejecución completada correctamente.
+El flujo de GitHub Actions compila automáticamente en cada push al repositorio y también se puede iniciar manualmente desde [Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml). Cuando termine correctamente, descarga el artefacto **Patriorigen-WebView-debug** desde la ejecución.
 
 ### En local
 
-Se necesita **JDK 17**, **Gradle 8.11.1**, Android SDK Platform **36** y Android SDK Build-Tools **36.0.0**. Desde la raíz del repositorio:
+Se necesita **JDK 17**, **Gradle 8.11.1**, Android SDK Platform **36** y Android SDK Build-Tools **36.0.0**. El Android SDK debe estar instalado y configurado para que Gradle lo encuentre. Desde la raíz del repositorio:
 
 ```sh
 gradle assembleDebug
