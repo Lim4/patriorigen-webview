@@ -86,22 +86,22 @@ public final class MainActivity extends ComponentActivity {
         navigationBarBackground.setBackgroundColor(0xFFF5EBEB);
         FrameLayout.LayoutParams navigationParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, android.view.Gravity.BOTTOM);
-        root.addView(navigationBarBackground, navigationParams);
-
         webView = new WebView(this);
         webView.setBackgroundColor(0xFF100003);
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         root.addView(webView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        root.addView(navigationBarBackground, navigationParams);
 
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             androidx.core.graphics.Insets bars =
                     insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            view.setPadding(0, bars.top, 0, bars.bottom);
+            // Let the WebView and the website's safe-area layout account for system bars once.
+            view.setPadding(0, 0, 0, 0);
             FrameLayout.LayoutParams params =
                     (FrameLayout.LayoutParams) navigationBarBackground.getLayoutParams();
             params.height = bars.bottom;
-            params.bottomMargin = -bars.bottom;
+            params.bottomMargin = 0;
             navigationBarBackground.setLayoutParams(params);
             return insets;
         });
