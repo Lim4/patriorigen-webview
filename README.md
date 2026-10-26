@@ -1,10 +1,14 @@
 # Patriorigen-WebView
 
-Aplicación Android experimental que abre [patriorigen.es](https://patriorigen.es) usando el WebView incluido en Android. Este proyecto es independiente de [patriorigen-geckoview](https://github.com/Lim4/patriorigen-geckoview), que permanece sin cambios.
+Aplicación Android experimental que muestra [patriorigen.es](https://patriorigen.es) en Android WebView y utiliza un lector de códigos nativo. Este proyecto es independiente de [patriorigen-geckoview](https://github.com/Lim4/patriorigen-geckoview), que permanece sin cambios.
+
+## Escaneo
+
+El lector nativo usa CameraX y el modelo integrado de ML Kit para códigos EAN-13, EAN-8, UPC-A y UPC-E. Prioriza el sensor trasero con mayor tamaño físico y autofocus cuando el fabricante lo expone; si no, utiliza la cámara trasera predeterminada. Se puede tocar la vista previa para enfocar. La búsqueda manual de la web sigue disponible.
 
 ## Descargar
 
-Las compilaciones de prueba estarán disponibles en la sección [Releases](https://github.com/Lim4/patriorigen-webview/releases). Por ahora, el flujo de GitHub Actions genera un APK de depuración como artefacto.
+El flujo de GitHub Actions genera un APK de depuración como artefacto. Las compilaciones de prueba también estarán disponibles en la sección [Releases](https://github.com/Lim4/patriorigen-webview/releases).
 
 ## Compilar
 
@@ -18,12 +22,12 @@ El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Permisos
 
-La aplicación solicita conexión a Internet. Cámara y micrófono se solicitan al sistema solo cuando la web los necesita; el acceso web se limita a solicitudes HTTPS de `patriorigen.es` y requiere confirmación del usuario.
+La aplicación necesita conexión a Internet y acceso a la cámara para el lector nativo. El WebView no recibe acceso directo a la cámara.
 
 ## Créditos
 
-Patriorigen y su contenido pertenecen a sus respectivos titulares. Android WebView se proporciona como parte de Android.
+Patriorigen y su contenido pertenecen a sus respectivos titulares. Android WebView, CameraX y ML Kit se proporcionan bajo sus respectivas licencias.
 
 ## Estado
 
-Prueba técnica para comparar el tamaño, mantenimiento y compatibilidad de WebView con la versión GeckoView. La versión GeckoView original sigue siendo el proyecto de referencia.
+Prueba técnica para comparar tamaño, mantenimiento y compatibilidad de WebView con la versión GeckoView. La versión GeckoView original sigue siendo el proyecto de referencia.
