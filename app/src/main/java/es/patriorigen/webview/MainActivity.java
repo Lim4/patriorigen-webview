@@ -335,13 +335,6 @@ public final class MainActivity extends ComponentActivity {
         cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
     }
 
-    private boolean isPatriorigenOrigin(Uri origin) {
-        if (origin == null || !"https".equalsIgnoreCase(origin.getScheme())) return false;
-        String host = origin.getHost();
-        return host != null && (host.equalsIgnoreCase("patriorigen.es")
-                || host.equalsIgnoreCase("www.patriorigen.es"));
-    }
-
     private boolean containsCameraRequest(String[] resources) {
         return resources != null && Arrays.asList(resources).contains(CAMERA_RESOURCE);
     }
