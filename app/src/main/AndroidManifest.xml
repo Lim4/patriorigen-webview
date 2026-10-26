@@ -8,6 +8,7 @@
         android:allowBackup="false"
         android:hardwareAccelerated="true"
         android:label="Patriorigen"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
         <provider
