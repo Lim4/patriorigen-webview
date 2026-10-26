@@ -4,16 +4,11 @@ Aplicación Android que abre [patriorigen.es](https://patriorigen.es/) dentro de
 
 ## Descargar e instalar
 
-La aplicación todavía no tiene versiones publicadas en **Releases**. Para descargar el APK de prueba:
+Descarga la APK de **Patriorigen WebView** desde la [última versión publicada en Releases](https://github.com/Lim4/patriorigen-webview/releases/latest).
 
-1. Abre [GitHub Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml).
-2. Selecciona la última ejecución correcta de **Build WebView APK**.
-3. Descarga el artefacto **Patriorigen-WebView-debug** y extrae el archivo APK.
-4. Abre el APK en el móvil y confirma la instalación. Android puede pedir permiso para instalar aplicaciones desde esa fuente.
+La aplicación requiere **Android 8.0 o posterior** (API 26). Para instalarla, abre el archivo APK descargado y confirma la instalación. Android puede pedirte que autorices la instalación desde esa fuente.
 
-El artefacto contiene una compilación de depuración. Para descargarlo, necesitas acceso al repositorio.
-
-La aplicación requiere **Android 8.0 o posterior** (API 26).
+Las versiones publicadas aquí son compilaciones de depuración. Si Android no permite actualizar sobre una versión anterior, desinstala la anterior y vuelve a instalar esta; las compilaciones pueden estar firmadas con claves distintas.
 
 ## Funciones
 
