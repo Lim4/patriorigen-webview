@@ -257,7 +257,7 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
-    private Intent createImageChooser(FileChooserParams params) {
+    private Intent createImageChooser(WebChromeClient.FileChooserParams params) {
         Intent contentIntent;
         try {
             contentIntent = params.createIntent();
@@ -267,7 +267,7 @@ public final class MainActivity extends ComponentActivity {
         }
         contentIntent.setType("image/*");
         contentIntent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE,
-                params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE);
+                params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE);
 
         Intent captureIntent = createCameraCaptureIntent();
         Intent chooser = Intent.createChooser(contentIntent, "Elegir fotografía");
