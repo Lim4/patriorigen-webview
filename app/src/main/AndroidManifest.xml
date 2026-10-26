@@ -1,12 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:label="Patriorigen-WebView"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:usesCleartextTraffic="false">
+        <activity
+            android:name=".ScannerActivity"
+            android:exported="false" />
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
