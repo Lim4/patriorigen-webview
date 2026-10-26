@@ -34,6 +34,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().getDecorView().setSystemUiVisibility(android.view.View.SYSTEM_UI_FLAG_FULLSCREEN);
 
         FrameLayout root = new FrameLayout(this);
         webView = new WebView(this);
@@ -140,6 +141,14 @@ public final class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != NATIVE_SCAN_REQUEST || resultCode != RESULT_OK || data == null) return;
+        if (data.getBooleanExtra(ScannerActivity.EXTRA_OPEN_MANUAL, false)) {
+            if (webView != null) {
+                webView.evaluateJavascript(
+                        "(function(){var b=document.getElementById('manualBtn');if(b)b.click();})();",
+                        null);
+            }
+            return;
+        }
         pendingBarcode = data.getStringExtra(ScannerActivity.EXTRA_BARCODE);
         deliverPendingBarcode();
     }
