@@ -26,6 +26,7 @@ import androidx.activity.ComponentActivity;
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import androidx.core.view.ViewCompat;
@@ -42,10 +43,10 @@ import java.util.List;
 public final class MainActivity extends ComponentActivity {
     private static final String HOME_URL = "https://patriorigen.es/";
     private static final String CAMERA_RESOURCE = PermissionRequest.RESOURCE_VIDEO_CAPTURE;
+    private static final int CAMERA_PERMISSION_REQUEST_CODE = 4102;
 
     private WebView webView;
     private PermissionRequest pendingCameraRequest;
-    private ActivityResultLauncher<String> cameraPermissionLauncher;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private android.webkit.ValueCallback<Uri[]> filePathCallback;
     private Uri pendingCameraPhotoUri;
@@ -122,40 +123,6 @@ public final class MainActivity extends ComponentActivity {
     }
 
     private void registerActivityResults() {
-        cameraPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestPermission(), granted -> {
-                    cameraPermissionRequestInFlight = false;
-                    boolean hasCamera = granted && ContextCompat.checkSelfPermission(
-                            this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
-                    if (startupPermissionRequestPending) {
-                        startupPermissionRequestPending = false;
-                        startupPermissionDenied = !hasCamera;
-                        openWebsite();
-                        return;
-                    }
-                    if (resumePermissionRequestPending) {
-                        resumePermissionRequestPending = false;
-                        startupPermissionDenied = !hasCamera;
-                        return;
-                    }
-
-                    PermissionRequest request = pendingCameraRequest;
-                    pendingCameraRequest = null;
-                    boolean wasUserRetry = userCameraTapPending;
-                    userCameraTapPending = false;
-                    if (request == null) return;
-                    if (hasCamera) {
-                        startupPermissionDenied = false;
-                        grantCameraRequest(request);
-                    } else {
-                        denyCameraRequest(request);
-                        if (wasUserRetry
-                                && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
-                            showCameraSettingsDialog();
-                        }
-                    }
-                });
-
         fileChooserLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(), result -> {
                     android.webkit.ValueCallback<Uri[]> callback = filePathCallback;
@@ -409,16 +376,56 @@ public final class MainActivity extends ComponentActivity {
     private void launchCameraPermissionRequest() {
         cameraPermissionRequestInFlight = true;
         try {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[] { Manifest.permission.CAMERA },
+                    CAMERA_PERMISSION_REQUEST_CODE);
         } catch (RuntimeException error) {
             cameraPermissionRequestInFlight = false;
-            if (startupPermissionRequestPending) {
-                startupPermissionRequestPending = false;
-                startupPermissionDenied = ContextCompat.checkSelfPermission(
-                        this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED;
-                openWebsite();
-            } else if (resumePermissionRequestPending) {
-                resumePermissionRequestPending = false;
+            finishCameraPermissionRequest(false);
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(
+            int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
+            boolean granted = grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED;
+            finishCameraPermissionRequest(granted);
+        }
+    }
+
+    private void finishCameraPermissionRequest(boolean granted) {
+        cameraPermissionRequestInFlight = false;
+        boolean hasCamera = granted && ContextCompat.checkSelfPermission(
+                this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        if (startupPermissionRequestPending) {
+            startupPermissionRequestPending = false;
+            startupPermissionDenied = !hasCamera;
+            openWebsite();
+            return;
+        }
+        if (resumePermissionRequestPending) {
+            resumePermissionRequestPending = false;
+            startupPermissionDenied = !hasCamera;
+            return;
+        }
+
+        PermissionRequest request = pendingCameraRequest;
+        pendingCameraRequest = null;
+        boolean wasUserRetry = userCameraTapPending;
+        userCameraTapPending = false;
+        if (request == null) return;
+        if (hasCamera) {
+            startupPermissionDenied = false;
+            grantCameraRequest(request);
+        } else {
+            denyCameraRequest(request);
+            if (wasUserRetry
+                    && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+                showCameraSettingsDialog();
             }
         }
     }
