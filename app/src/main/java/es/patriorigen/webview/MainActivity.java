@@ -55,6 +55,8 @@ public final class MainActivity extends ComponentActivity {
     private static final String HOME_URL = "https://patriorigen.es/";
     private static final String CAMERA_RESOURCE = PermissionRequest.RESOURCE_VIDEO_CAPTURE;
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 4102;
+    private static final int MAX_BARCODE_FRAME_DIMENSION = 4096;
+    private static final long MAX_BARCODE_FRAME_PIXELS = 4_194_304L;
 
     private WebView webView;
     private BarcodeScanner barcodeScanner;
@@ -300,6 +302,8 @@ public final class MainActivity extends ComponentActivity {
 
     private boolean isPatriorigenOrigin(Uri uri) {
         if (uri == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
+        int port = uri.getPort();
+        if (port != -1 && port != 443) return false;
         String host = uri.getHost();
         return host != null && (host.equalsIgnoreCase("patriorigen.es")
                 || host.equalsIgnoreCase("www.patriorigen.es"));
@@ -321,6 +325,17 @@ public final class MainActivity extends ComponentActivity {
                 int separator = dataUrl.indexOf(',');
                 String encoded = separator >= 0 ? dataUrl.substring(separator + 1) : dataUrl;
                 byte[] bytes = Base64.decode(encoded, Base64.DEFAULT);
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.length, bounds);
+                long pixels = (long) bounds.outWidth * bounds.outHeight;
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0
+                        || bounds.outWidth > MAX_BARCODE_FRAME_DIMENSION
+                        || bounds.outHeight > MAX_BARCODE_FRAME_DIMENSION
+                        || pixels > MAX_BARCODE_FRAME_PIXELS) {
+                    processingMlKitFrame.set(false);
+                    return;
+                }
                 bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
                 if (bitmap == null) {
                     processingMlKitFrame.set(false);
@@ -342,6 +357,9 @@ public final class MainActivity extends ComponentActivity {
                             processingMlKitFrame.set(false);
                         });
             } catch (RuntimeException error) {
+                if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+                processingMlKitFrame.set(false);
+            } catch (OutOfMemoryError error) {
                 if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
                 processingMlKitFrame.set(false);
             }
@@ -572,3 +590,4 @@ public final class MainActivity extends ComponentActivity {
         super.onDestroy();
     }
 }
+
