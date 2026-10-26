@@ -8,10 +8,10 @@ Las compilaciones de prueba estarán disponibles en la sección [Releases](https
 
 ## Compilar
 
-Se necesita Android Studio o un entorno con JDK 17 y Android SDK (plataforma 36).
+Se necesita Android Studio o un entorno con JDK 17, Gradle 8.11.1 y Android SDK (plataforma 36).
 
 ```sh
-./gradlew assembleDebug
+gradle assembleDebug
 ```
 
 El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
