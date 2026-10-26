@@ -26,9 +26,10 @@ jobs:
           gradle-version: '8.11.1'
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - name: Build debug APK
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
           gradle assembleDebug
       - name: Upload APK
