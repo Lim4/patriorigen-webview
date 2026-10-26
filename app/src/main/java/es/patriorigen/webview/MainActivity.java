@@ -2,6 +2,8 @@ package es.patriorigen.webview;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -9,6 +11,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.provider.Settings;
+import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.PermissionRequest;
@@ -34,11 +37,19 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 
+import com.google.mlkit.vision.barcode.Barcode;
+import com.google.mlkit.vision.barcode.BarcodeScanner;
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
+import com.google.mlkit.vision.barcode.BarcodeScanning;
+import com.google.mlkit.vision.common.InputImage;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.json.JSONObject;
 
 public final class MainActivity extends ComponentActivity {
     private static final String HOME_URL = "https://patriorigen.es/";
@@ -46,6 +57,8 @@ public final class MainActivity extends ComponentActivity {
     private static final int CAMERA_PERMISSION_REQUEST_CODE = 4102;
 
     private WebView webView;
+    private BarcodeScanner barcodeScanner;
+    private final AtomicBoolean processingMlKitFrame = new AtomicBoolean(false);
     private PermissionRequest pendingCameraRequest;
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private android.webkit.ValueCallback<Uri[]> filePathCallback;
@@ -169,6 +182,17 @@ public final class MainActivity extends ComponentActivity {
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSafeBrowsingEnabled(true);
 
+        BarcodeScannerOptions barcodeOptions = new BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                        Barcode.FORMAT_EAN_13,
+                        Barcode.FORMAT_EAN_8,
+                        Barcode.FORMAT_UPC_A,
+                        Barcode.FORMAT_UPC_E,
+                        Barcode.FORMAT_CODE_128,
+                        Barcode.FORMAT_ITF)
+                .build();
+        barcodeScanner = BarcodeScanning.getClient(barcodeOptions);
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
@@ -248,6 +272,25 @@ public final class MainActivity extends ComponentActivity {
                 + "v.addEventListener('emptied',hide);v.addEventListener('pause',function(){if(!v.srcObject||!v.srcObject.active)hide()});"
                 + "if(v.srcObject&&v.srcObject.getTracks)v.srcObject.getTracks().forEach(function(t){t.addEventListener('ended',hide)});"
                 + "reveal();}"
+                + "if(v&&!window.__patriorigenMlKitInstalled){window.__patriorigenMlKitInstalled=true;"
+                + "var c=document.createElement('canvas'),ctx=c.getContext('2d'),lastTime=-1,accepted=false;"
+                + "window.PatriorigenMlKit={onBarcode:function(code){"
+                + "if(accepted||!/^\\\\d{8,14}$/.test(code))return;"
+                + "var overlay=document.getElementById('resultOverlay');"
+                + "if(overlay&&getComputedStyle(overlay).visibility!=='hidden'&&Number(getComputedStyle(overlay).opacity)>0)return;"
+                + "accepted=true;var input=document.getElementById('barcodeInput'),form=document.getElementById('manualForm'),button=document.getElementById('searchBtn');"
+                + "if(!input||!form){accepted=false;return;}var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;"
+                + "setter.call(input,code);input.dispatchEvent(new Event('input',{bubbles:true}));"
+                + "if(form.requestSubmit)form.requestSubmit(button||undefined);else if(button)button.click();"
+                + "}};"
+                + "var close=document.getElementById('resultClose');if(close)close.addEventListener('click',function(){accepted=false});"
+                + "var scanFrame=function(){try{var overlay=document.getElementById('resultOverlay');"
+                + "if(accepted||document.hidden||!v.srcObject||v.readyState<2||!v.videoWidth||!v.videoHeight||v.currentTime===lastTime)return;"
+                + "if(overlay&&getComputedStyle(overlay).visibility!=='hidden'&&Number(getComputedStyle(overlay).opacity)>0)return;"
+                + "lastTime=v.currentTime;var scale=Math.min(1,1280/v.videoWidth);c.width=Math.round(v.videoWidth*scale);c.height=Math.round(v.videoHeight*scale);"
+                + "ctx.drawImage(v,0,0,c.width,c.height);AndroidCamera.submitFrame(c.toDataURL('image/jpeg',0.58));}catch(e){}};"
+                + "window.__patriorigenMlKitTimer=setInterval(scanFrame,300);"
+                + "}"
                 + "var b=document.getElementById('startBtn');if(b&&!b.dataset.androidPermissionHook){"
                 + "b.dataset.androidPermissionHook='1';b.addEventListener('click',function(){"
                 + "AndroidCamera.cameraButtonPressed()},true);}"
@@ -267,6 +310,52 @@ public final class MainActivity extends ComponentActivity {
         public void cameraButtonPressed() {
             if (trustedMainFrame) userCameraTapPending = true;
         }
+
+        @JavascriptInterface
+        public void submitFrame(String dataUrl) {
+            if (!trustedMainFrame || dataUrl == null || dataUrl.length() > 2_000_000
+                    || barcodeScanner == null
+                    || !processingMlKitFrame.compareAndSet(false, true)) return;
+            Bitmap bitmap = null;
+            try {
+                int separator = dataUrl.indexOf(',');
+                String encoded = separator >= 0 ? dataUrl.substring(separator + 1) : dataUrl;
+                byte[] bytes = Base64.decode(encoded, Base64.DEFAULT);
+                bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+                if (bitmap == null) {
+                    processingMlKitFrame.set(false);
+                    return;
+                }
+                Bitmap frame = bitmap;
+                barcodeScanner.process(InputImage.fromBitmap(frame, 0))
+                        .addOnSuccessListener(barcodes -> {
+                            for (Barcode barcode : barcodes) {
+                                String value = barcode.getRawValue();
+                                if (value != null && value.matches("[0-9]{8,14}")) {
+                                    deliverMlKitBarcode(value);
+                                    break;
+                                }
+                            }
+                        })
+                        .addOnCompleteListener(task -> {
+                            if (!frame.isRecycled()) frame.recycle();
+                            processingMlKitFrame.set(false);
+                        });
+            } catch (RuntimeException error) {
+                if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle();
+                processingMlKitFrame.set(false);
+            }
+        }
+    }
+
+    private void deliverMlKitBarcode(String value) {
+        WebView current = webView;
+        if (current == null || !trustedMainFrame) return;
+        String script = "window.PatriorigenMlKit&&window.PatriorigenMlKit.onBarcode("
+                + JSONObject.quote(value) + ");";
+        current.post(() -> {
+            if (webView == current && trustedMainFrame) current.evaluateJavascript(script, null);
+        });
     }
 
     private void showCameraSettingsDialog() {
@@ -470,6 +559,10 @@ public final class MainActivity extends ComponentActivity {
         if (pendingCameraRequest != null) {
             denyCameraRequest(pendingCameraRequest);
             pendingCameraRequest = null;
+        }
+        if (barcodeScanner != null) {
+            barcodeScanner.close();
+            barcodeScanner = null;
         }
         if (webView != null) {
             webView.stopLoading();
