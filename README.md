@@ -67,6 +67,6 @@ Datos principales del proyecto:
 ## Créditos y licencias
 
 - **Patriorigen:** web, marca e icono pertenecen a sus titulares. Consulta el [aviso legal](https://patriorigen.es/aviso-legal.html).
-- **Google ML Kit:** biblioteca de escaneo de códigos de barras integrada en esta aplicación.
+- **Google ML Kit:** biblioteca de escaneo de códigos de barras integrada en esta aplicación; se distribuye bajo sus propios términos de licencia.
 - Este cliente Android es independiente de [Patriorigen GeckoView](https://github.com/Lim4/patriorigen-geckoview) y no está afiliado oficialmente con Mozilla ni con los titulares de Patriorigen.
-- Este repositorio no incluye actualmente un archivo `LICENSE`; por tanto, no declara una licencia de distribución para el código del cliente.
+- El código y la documentación originales de este proyecto se distribuyen bajo la **licencia MIT**; consulta [LICENSE](LICENSE). La licencia no cubre la marca, el icono ni los contenidos de Patriorigen, ni las dependencias de terceros, que conservan sus respectivos derechos y licencias.
