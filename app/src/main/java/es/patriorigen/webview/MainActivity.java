@@ -19,6 +19,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MainActivity extends Activity {
+    private static final String CAMERA_TUNING_SCRIPT =
+            "(function(){"
+                    + "if(window.__patriorigenCameraTuningInstalled)return;"
+                    + "window.__patriorigenCameraTuningInstalled=true;"
+                    + "var tunedTracks=new WeakSet();"
+                    + "window.setInterval(function(){"
+                    + "var video=document.getElementById('video');"
+                    + "var tracks=video&&video.srcObject&&video.srcObject.getVideoTracks?video.srcObject.getVideoTracks():[];"
+                    + "if(!tracks.length)return;"
+                    + "var track=tracks[0];if(tunedTracks.has(track))return;tunedTracks.add(track);"
+                    + "var constraints={width:{ideal:1280,max:1280},height:{ideal:720,max:720},frameRate:{ideal:30,max:30}};"
+                    + "try{var caps=track.getCapabilities?track.getCapabilities():{};"
+                    + "if(caps.focusMode&&caps.focusMode.indexOf('continuous')!==-1)"
+                    + "constraints.advanced=[{focusMode:'continuous'}];}catch(e){}"
+                    + "if(track.applyConstraints)track.applyConstraints(constraints).catch(function(){});"
+                    + "},250);"
+                    + "})();";
     private static final int MEDIA_PERMISSION_REQUEST = 4101;
     private WebView webView;
     private PermissionRequest pendingWebPermission;
@@ -41,6 +58,19 @@ public final class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                Uri uri = Uri.parse(url);
+                String host = uri.getHost();
+                if ("https".equalsIgnoreCase(uri.getScheme())
+                        && host != null
+                        && (host.equalsIgnoreCase("patriorigen.es")
+                            || host.equalsIgnoreCase("www.patriorigen.es"))) {
+                    view.evaluateJavascript(CAMERA_TUNING_SCRIPT, null);
+                }
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
