@@ -1,18 +1,16 @@
-# Patriorigen-WebView
+# Patriorigen para Android
 
-Aplicación Android experimental que muestra [patriorigen.es](https://patriorigen.es) en Android WebView y utiliza un lector de códigos nativo. Este proyecto es independiente de [patriorigen-geckoview](https://github.com/Lim4/patriorigen-geckoview), que permanece sin cambios.
+Aplicación Android ligera que abre https://patriorigen.es/ en un WebView y conserva la interfaz y las funciones que ofrece la web.
 
-## Escaneo
+## Cámara y permisos
 
-El lector nativo usa CameraX y el modelo integrado de ML Kit para códigos EAN-13, EAN-8, UPC-A y UPC-E. Prioriza el sensor trasero con mayor tamaño físico y autofocus cuando el fabricante lo expone; si no, utiliza la cámara trasera predeterminada. Se puede tocar la vista previa para enfocar. La búsqueda manual de la web sigue disponible.
+El escáner web usa ZXing y la cámara del navegador. El WebView solicita el permiso de vídeo únicamente para el origen HTTPS de Patriorigen; Android muestra su diálogo de cámara cuando la página intenta iniciar el escáner. Las opciones disponibles y su duración dependen de la versión de Android. Si el permiso queda concedido, se reutiliza; si Android lo revoca, se vuelve a solicitar.
 
-## Descargar
+La entrada de código manual sigue funcionando sin permiso de cámara. La selección o captura de fotos para los reportes usa el selector de imágenes de Android.
 
-El flujo de GitHub Actions genera un APK de depuración como artefacto. Las compilaciones de prueba también estarán disponibles en la sección [Releases](https://github.com/Lim4/patriorigen-webview/releases).
+## Compilación
 
-## Compilar
-
-Se necesita Android Studio o un entorno con JDK 17, Gradle 8.11.1 y Android SDK (plataforma 36).
+Requiere JDK 17, Gradle 8.11.1 y Android SDK 36.
 
 ```sh
 gradle assembleDebug
@@ -20,14 +18,6 @@ gradle assembleDebug
 
 El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Permisos
+## Proyecto de referencia
 
-La aplicación necesita conexión a Internet y acceso a la cámara para el lector nativo. El WebView no recibe acceso directo a la cámara.
-
-## Créditos
-
-Patriorigen y su contenido pertenecen a sus respectivos titulares. Android WebView, CameraX y ML Kit se proporcionan bajo sus respectivas licencias.
-
-## Estado
-
-Prueba técnica para comparar tamaño, mantenimiento y compatibilidad de WebView con la versión GeckoView. La versión GeckoView original sigue siendo el proyecto de referencia.
+Este proyecto es independiente de [patriorigen-geckoview](https://github.com/Lim4/patriorigen-geckoview). El repositorio GeckoView permanece sin cambios.
