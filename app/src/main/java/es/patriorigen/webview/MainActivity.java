@@ -3,6 +3,10 @@ package es.patriorigen.webview;
 import android.Manifest;
 import android.app.Activity;
 import android.content.pm.PackageManager;
+import android.content.Intent;
+import android.provider.Settings;
+import android.net.Uri;
+import android.app.AlertDialog;
 import android.graphics.Color;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
@@ -37,6 +41,8 @@ import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -71,15 +77,28 @@ public final class MainActivity extends ComponentActivity {
     private boolean pageReady;
     private boolean cameraPaused;
     private boolean cameraStarted;
+    private boolean permissionRequestInFlight;
+    private boolean permissionDenied;
     private String pendingBarcode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(160, 0, 20));
-        getWindow().setNavigationBarColor(Color.rgb(245, 235, 235));
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        WindowInsetsControllerCompat systemBars =
+                new WindowInsetsControllerCompat(getWindow(), getWindow().getDecorView());
+        systemBars.setAppearanceLightStatusBars(false);
+        systemBars.setAppearanceLightNavigationBars(true);
 
         root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(160, 0, 20));
+        View navigationBarScrim = new View(this);
+        navigationBarScrim.setBackgroundColor(Color.rgb(245, 235, 235));
+        FrameLayout.LayoutParams scrimParams = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, android.view.Gravity.BOTTOM);
+        root.addView(navigationBarScrim, scrimParams);
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
         previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
@@ -94,6 +113,11 @@ public final class MainActivity extends ComponentActivity {
         ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             view.setPadding(0, bars.top, 0, bars.bottom);
+            ViewGroup.LayoutParams rawParams = navigationBarScrim.getLayoutParams();
+            FrameLayout.LayoutParams navParams = (FrameLayout.LayoutParams) rawParams;
+            navParams.height = bars.bottom;
+            navParams.bottomMargin = -bars.bottom;
+            navigationBarScrim.setLayoutParams(navParams);
             return insets;
         });
         setContentView(root);
@@ -123,6 +147,8 @@ public final class MainActivity extends ComponentActivity {
                 if (!isTrustedUrl(url)) return;
                 pageReady = true;
                 installPatriorigenCameraLayer();
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                        == PackageManager.PERMISSION_GRANTED) startCamera();
                 deliverPendingBarcode();
             }
 
@@ -144,6 +170,11 @@ public final class MainActivity extends ComponentActivity {
                 request.deny();
             }
         });
+
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestCameraPermission();
+        }
 
         if (savedInstanceState != null) webView.restoreState(savedInstanceState);
         else webView.loadUrl(HOME_URL);
@@ -181,7 +212,11 @@ public final class MainActivity extends ComponentActivity {
                 + "overlay.dataset.nativeObserver='1';new MutationObserver(function(){"
                 + "if(overlay.classList.contains('show')||overlay.classList.contains('active'))NativeScanner.pause();"
                 + "else NativeScanner.resume()}).observe(overlay,{attributes:true,attributeFilter:['class']});}"
-                + "NativeScanner.start();})();";
+                + "var cs=document.getElementById('cameraStatus');if(cs&&!cs.dataset.nativeStatusObserver){"
+                + "cs.dataset.nativeStatusObserver='1';new MutationObserver(function(){"
+                + "if(/denegad|rechazad/i.test(cs.textContent))cs.textContent='Permite el acceso a la cámara para escanear';"
+                + "}).observe(cs,{childList:true,subtree:true,characterData:true});}"
+                + "})();";
         webView.evaluateJavascript(script, null);
     }
 
@@ -192,7 +227,7 @@ public final class MainActivity extends ComponentActivity {
                 cameraPaused = false;
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
                         == PackageManager.PERMISSION_GRANTED) startCamera();
-                else requestPermissions(new String[] { Manifest.permission.CAMERA }, CAMERA_PERMISSION_REQUEST);
+                else requestCameraPermission();
             });
         }
         @JavascriptInterface public void pause() {
@@ -233,6 +268,31 @@ public final class MainActivity extends ComponentActivity {
                 deliverPendingBarcode();
             });
         }
+    }
+
+    private void requestCameraPermission() {
+        if (permissionRequestInFlight) return;
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            permissionDenied = false;
+            if (pageReady) startCamera();
+            return;
+        }
+        permissionRequestInFlight = true;
+        requestPermissions(new String[] { Manifest.permission.CAMERA }, CAMERA_PERMISSION_REQUEST);
+    }
+
+    private void showCameraSettingsDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Permiso de cámara")
+                .setMessage("Para escanear, permite el acceso a la cámara en los ajustes de Android. También puedes introducir el código manualmente.")
+                .setNegativeButton("Ahora no", (dialog, which) -> { })
+                .setPositiveButton("Abrir ajustes", (dialog, which) -> {
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                })
+                .show();
     }
 
     private void startCamera() {
@@ -368,9 +428,17 @@ public final class MainActivity extends ComponentActivity {
 
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
-        if (requestCode == CAMERA_PERMISSION_REQUEST) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) startCamera();
-            else updateCameraButton(false, "Permite la cámara o introduce el código manualmente");
+        if (requestCode != CAMERA_PERMISSION_REQUEST) return;
+        permissionRequestInFlight = false;
+        boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+        permissionDenied = !granted;
+        if (granted) {
+            startCamera();
+        } else {
+            updateCameraButton(false, "Permite el acceso a la cámara para escanear");
+            if (!shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+                showCameraSettingsDialog();
+            }
         }
     }
     @Override public void onBackPressed() {
