@@ -18,7 +18,7 @@ Las versiones publicadas aquí son compilaciones de depuración. Si Android no p
 
 ## Cámara y permisos
 
-Android gestiona el permiso de cámara y muestra su solicitud del sistema. El WebView concede acceso de vídeo únicamente a Patriorigen en HTTPS. Si se rechaza el permiso, el código manual sigue disponible y se puede volver a intentar desde la interfaz de la web.
+Android solicita el permiso de cámara al iniciar la aplicación si todavía no está concedido. Si ya se concedió, el sistema no vuelve a mostrar el diálogo. El WebView concede acceso de vídeo únicamente a Patriorigen mediante HTTPS. Si se deniega el permiso, el código manual sigue disponible y se puede volver a intentar desde la interfaz web. Si Android ya no permite mostrar otra solicitud, el permiso se puede activar en los ajustes de la aplicación.
 
 El procesamiento de los fotogramas para leer el código se realiza localmente. Una vez leído, el número se entrega a Patriorigen para la consulta del producto, que puede utilizar servicios de red.
 
