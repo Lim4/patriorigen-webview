@@ -65,6 +65,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class MainActivity extends ComponentActivity {
     private static final int CAMERA_PERMISSION_REQUEST = 5101;
     private static final String HOME_URL = "https://patriorigen.es";
+    private static final String PERMISSION_PREFS = "camera_permission_preferences";
+    private static final String KEY_PERMISSION_DECLINED = "camera_permission_declined";
 
     private FrameLayout root;
     private PreviewView previewView;
@@ -173,8 +175,10 @@ public final class MainActivity extends ComponentActivity {
         });
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
-            requestCameraPermission();
+                != PackageManager.PERMISSION_GRANTED
+                && !getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE)
+                        .getBoolean(KEY_PERMISSION_DECLINED, false)) {
+            requestCameraPermission(false);
         }
 
         if (savedInstanceState != null) webView.restoreState(savedInstanceState);
@@ -241,7 +245,7 @@ public final class MainActivity extends ComponentActivity {
                 cameraPaused = false;
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
                         == PackageManager.PERMISSION_GRANTED) startCamera();
-                else requestCameraPermission();
+                else requestCameraPermission(true);
             });
         }
         @JavascriptInterface public void pause() {
@@ -254,10 +258,13 @@ public final class MainActivity extends ComponentActivity {
         }
         @JavascriptInterface public void resume() {
             runOnUiThread(() -> {
-                if (cameraPaused) {
-                    barcodeHandled.set(false);
-                    cameraPaused = false;
-                    start();
+                barcodeHandled.set(false);
+                cameraPaused = false;
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    startCamera();
+                } else {
+                    requestCameraPermission(true);
                 }
             });
         }
@@ -285,12 +292,21 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
-    private void requestCameraPermission() {
+    private void requestCameraPermission(boolean userInitiated) {
         if (permissionRequestInFlight) return;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
             permissionDenied = false;
+            getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE).edit()
+                    .putBoolean(KEY_PERMISSION_DECLINED, false).apply();
             if (pageReady) startCamera();
+            return;
+        }
+        boolean wasDeclined = getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE)
+                .getBoolean(KEY_PERMISSION_DECLINED, false);
+        if (userInitiated && wasDeclined
+                && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+            showCameraSettingsDialog();
             return;
         }
         permissionRequestInFlight = true;
@@ -447,7 +463,10 @@ public final class MainActivity extends ComponentActivity {
         permissionRequestInFlight = false;
         boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         permissionDenied = !granted;
+        getSharedPreferences(PERMISSION_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(KEY_PERMISSION_DECLINED, !granted).apply();
         if (granted) {
+            permissionDenied = false;
             startCamera();
         } else {
             updateCameraButton(false, "Permite el acceso a la cámara para escanear");
