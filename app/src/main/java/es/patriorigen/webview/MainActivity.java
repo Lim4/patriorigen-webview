@@ -275,7 +275,7 @@ public final class MainActivity extends ComponentActivity {
                 + "if(v&&!window.__patriorigenMlKitInstalled){window.__patriorigenMlKitInstalled=true;"
                 + "var c=document.createElement('canvas'),ctx=c.getContext('2d'),lastTime=-1,accepted=false;"
                 + "window.PatriorigenMlKit={onBarcode:function(code){"
-                + "if(accepted||!/^\\\\d{8,14}$/.test(code))return;"
+                + "if(accepted||!/^[0-9]{8,14}$/.test(code))return;"
                 + "var overlay=document.getElementById('resultOverlay');"
                 + "if(overlay&&getComputedStyle(overlay).visibility!=='hidden'&&Number(getComputedStyle(overlay).opacity)>0)return;"
                 + "accepted=true;var input=document.getElementById('barcodeInput'),form=document.getElementById('manualForm'),button=document.getElementById('searchBtn');"
