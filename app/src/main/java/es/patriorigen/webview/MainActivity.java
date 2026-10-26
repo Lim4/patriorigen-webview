@@ -18,6 +18,8 @@ import android.net.http.SslError;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.Toast;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import org.json.JSONObject;
 
@@ -58,7 +60,13 @@ public final class MainActivity extends Activity {
         buttonParams.bottomMargin = dp(88);
         buttonParams.rightMargin = dp(16);
         root.addView(scanButton, buttonParams);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            int bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;
+            view.setPadding(0, 0, 0, bottomInset);
+            return insets;
+        });
         setContentView(root);
+        ViewCompat.requestApplyInsets(root);
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -85,6 +93,7 @@ public final class MainActivity extends Activity {
                         "(function(){"
                                 + "var b=document.getElementById('startBtn');if(b)b.style.display='none';"
                                 + "var s=document.getElementById('cameraStatus');if(s)s.style.display='none';"
+                                + "var v=document.getElementById('video');if(v){v.pause();v.style.setProperty('display','none','important');}"
                                 + "var p=document.getElementById('placeholder');"
                                 + "if(p){var a=p.querySelector('strong'),c=p.querySelector('span');"
                                 + "if(a)a.textContent='Cámara principal';"
