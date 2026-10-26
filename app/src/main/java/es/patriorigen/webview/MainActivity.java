@@ -42,18 +42,20 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         scanButton = new Button(this);
-        scanButton.setText("Escanear con lente principal");
+        scanButton.setText("Escanear");
         scanButton.setTextColor(Color.WHITE);
         GradientDrawable buttonBackground = new GradientDrawable();
-        buttonBackground.setColor(0xFFB30920);
-        buttonBackground.setCornerRadius(dp(24));
+        buttonBackground.setColor(0xCC303030);
+        buttonBackground.setCornerRadius(dp(20));
         scanButton.setBackground(buttonBackground);
         scanButton.setElevation(dp(8));
         scanButton.setOnClickListener(view -> launchNativeScanner());
 
+        scanButton.setPadding(dp(18), 0, dp(18), 0);
         FrameLayout.LayoutParams buttonParams = new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, dp(52), Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        buttonParams.bottomMargin = dp(84);
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(44), Gravity.BOTTOM | Gravity.END);
+        buttonParams.bottomMargin = dp(88);
+        buttonParams.rightMargin = dp(16);
         root.addView(scanButton, buttonParams);
         setContentView(root);
 
