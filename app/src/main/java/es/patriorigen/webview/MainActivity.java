@@ -336,7 +336,7 @@ public final class MainActivity extends ComponentActivity {
             denyCameraRequest(pendingCameraRequest);
         }
         pendingCameraRequest = request;
-        cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+        launchCameraPermissionRequest();
     }
 
     private boolean containsCameraRequest(String[] resources) {
