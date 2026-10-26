@@ -52,6 +52,9 @@ public final class MainActivity extends ComponentActivity {
     private Bundle stateToRestore;
     private boolean startupPermissionRequestPending;
     private boolean startupPermissionDenied;
+    private boolean resumePermissionRequestPending;
+    private boolean cameraPermissionRequestInFlight;
+    private boolean checkCameraPermissionOnResume;
     private volatile boolean trustedMainFrame;
     private volatile boolean userCameraTapPending;
 
@@ -103,13 +106,8 @@ public final class MainActivity extends ComponentActivity {
 
         stateToRestore = savedInstanceState;
         webView.post(() -> {
-            if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
-                    == PackageManager.PERMISSION_GRANTED) {
-                openWebsite();
-            } else {
-                startupPermissionRequestPending = true;
-                cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
-            }
+            startupPermissionRequestPending = true;
+            launchCameraPermissionRequest();
         });
     }
 
@@ -126,12 +124,18 @@ public final class MainActivity extends ComponentActivity {
     private void registerActivityResults() {
         cameraPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(), granted -> {
+                    cameraPermissionRequestInFlight = false;
                     boolean hasCamera = granted && ContextCompat.checkSelfPermission(
                             this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
                     if (startupPermissionRequestPending) {
                         startupPermissionRequestPending = false;
                         startupPermissionDenied = !hasCamera;
                         openWebsite();
+                        return;
+                    }
+                    if (resumePermissionRequestPending) {
+                        resumePermissionRequestPending = false;
+                        startupPermissionDenied = !hasCamera;
                         return;
                     }
 
@@ -402,10 +406,40 @@ public final class MainActivity extends ComponentActivity {
         }
     }
 
+    private void launchCameraPermissionRequest() {
+        cameraPermissionRequestInFlight = true;
+        try {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+        } catch (RuntimeException error) {
+            cameraPermissionRequestInFlight = false;
+            if (startupPermissionRequestPending) {
+                startupPermissionRequestPending = false;
+                startupPermissionDenied = ContextCompat.checkSelfPermission(
+                        this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED;
+                openWebsite();
+            } else if (resumePermissionRequestPending) {
+                resumePermissionRequestPending = false;
+            }
+        }
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
         if (webView != null) webView.onResume();
+        if (checkCameraPermissionOnResume && !cameraPermissionRequestInFlight) {
+            checkCameraPermissionOnResume = false;
+            resumePermissionRequestPending = true;
+            launchCameraPermissionRequest();
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        if (!cameraPermissionRequestInFlight) {
+            checkCameraPermissionOnResume = true;
+        }
+        super.onStop();
     }
 
     @Override
