@@ -149,6 +149,7 @@ public final class MainActivity extends ComponentActivity {
                 installPatriorigenCameraLayer();
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
                         == PackageManager.PERMISSION_GRANTED) startCamera();
+                else updateCameraButton(false, "Permite el acceso a la cámara para escanear");
                 deliverPendingBarcode();
             }
 
