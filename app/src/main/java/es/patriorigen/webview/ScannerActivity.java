@@ -43,6 +43,8 @@ import androidx.camera.core.Preview;
 import androidx.camera.lifecycle.ProcessCameraProvider;
 import androidx.camera.view.PreviewView;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.mlkit.vision.barcode.BarcodeScanning;
@@ -108,6 +110,7 @@ public final class ScannerActivity extends ComponentActivity {
 
         previewView = new PreviewView(this);
         previewView.setScaleType(PreviewView.ScaleType.FILL_CENTER);
+        previewView.setImplementationMode(PreviewView.ImplementationMode.COMPATIBLE);
         root.addView(previewView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
@@ -245,7 +248,13 @@ public final class ScannerActivity extends ComponentActivity {
             return true;
         });
 
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            int bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom;
+            view.setPadding(0, 0, 0, bottomInset);
+            return insets;
+        });
         setContentView(root);
+        ViewCompat.requestApplyInsets(root);
     }
 
     private GradientDrawable roundBackground(int fill, int stroke, int radius) {
