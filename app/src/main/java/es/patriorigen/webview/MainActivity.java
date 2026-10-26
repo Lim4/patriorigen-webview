@@ -1,15 +1,18 @@
 package es.patriorigen.webview;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.PermissionRequest;
+import android.webkit.JavascriptInterface;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -46,6 +49,11 @@ public final class MainActivity extends ComponentActivity {
     private ActivityResultLauncher<Intent> fileChooserLauncher;
     private android.webkit.ValueCallback<Uri[]> filePathCallback;
     private Uri pendingCameraPhotoUri;
+    private Bundle stateToRestore;
+    private boolean startupPermissionRequestPending;
+    private boolean startupPermissionDenied;
+    private volatile boolean trustedMainFrame;
+    private volatile boolean userCameraTapPending;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,8 +101,24 @@ public final class MainActivity extends ComponentActivity {
             }
         });
 
-        if (savedInstanceState != null && webView.restoreState(savedInstanceState) != null) {
-            return;
+        stateToRestore = savedInstanceState;
+        webView.post(() -> {
+            if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                    == PackageManager.PERMISSION_GRANTED) {
+                openWebsite();
+            } else {
+                startupPermissionRequestPending = true;
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+            }
+        });
+    }
+
+    private void openWebsite() {
+        if (webView == null) return;
+        if (stateToRestore != null) {
+            Bundle saved = stateToRestore;
+            stateToRestore = null;
+            if (webView.restoreState(saved) != null) return;
         }
         webView.loadUrl(HOME_URL);
     }
@@ -102,14 +126,29 @@ public final class MainActivity extends ComponentActivity {
     private void registerActivityResults() {
         cameraPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(), granted -> {
+                    boolean hasCamera = granted && ContextCompat.checkSelfPermission(
+                            this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+                    if (startupPermissionRequestPending) {
+                        startupPermissionRequestPending = false;
+                        startupPermissionDenied = !hasCamera;
+                        openWebsite();
+                        return;
+                    }
+
                     PermissionRequest request = pendingCameraRequest;
                     pendingCameraRequest = null;
+                    boolean wasUserRetry = userCameraTapPending;
+                    userCameraTapPending = false;
                     if (request == null) return;
-                    if (granted && ContextCompat.checkSelfPermission(
-                            this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    if (hasCamera) {
+                        startupPermissionDenied = false;
                         grantCameraRequest(request);
                     } else {
                         denyCameraRequest(request);
+                        if (wasUserRetry
+                                && !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)) {
+                            showCameraSettingsDialog();
+                        }
                     }
                 });
 
@@ -161,9 +200,26 @@ public final class MainActivity extends ComponentActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                trustedMainFrame = isPatriorigenOrigin(Uri.parse(url));
+            }
+
+            @Override
+            public void onPageCommitVisible(WebView view, String url) {
+                super.onPageCommitVisible(view, url);
+                if (isPatriorigenOrigin(Uri.parse(url))) installCameraPlaceholderGuard(view);
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                if (isPatriorigenOrigin(Uri.parse(url))) installCameraPlaceholderGuard(view);
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                Uri uri = request.getUrl();
-                return !"https".equalsIgnoreCase(uri.getScheme());
+                return !isPatriorigenOrigin(request.getUrl());
             }
 
             @Override
@@ -173,6 +229,7 @@ public final class MainActivity extends ComponentActivity {
             }
         });
 
+        webView.addJavascriptInterface(new CameraBridge(), "AndroidCamera");
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(PermissionRequest request) {
@@ -205,6 +262,55 @@ public final class MainActivity extends ComponentActivity {
         });
     }
 
+    private void installCameraPlaceholderGuard(WebView view) {
+        String script = "(function(){"
+                + "var v=document.getElementById('video');"
+                + "if(v&&!v.dataset.androidVideoGuard){v.dataset.androidVideoGuard='1';"
+                + "var style=document.getElementById('patriorigenVideoStartupStyle');"
+                + "if(!style){style=document.createElement('style');style.id='patriorigenVideoStartupStyle';"
+                + "style.textContent='#video{visibility:hidden!important;background:transparent!important}'"
+                + "+'#video.android-camera-ready{visibility:visible!important}';document.head.appendChild(style);}"
+                + "var hide=function(){v.classList.remove('android-camera-ready')};"
+                + "var reveal=function(){if(v.readyState>=2&&v.videoWidth>0&&v.videoHeight>0)"
+                + "v.classList.add('android-camera-ready')};"
+                + "v.addEventListener('loadedmetadata',reveal);v.addEventListener('playing',reveal);"
+                + "v.addEventListener('emptied',hide);v.addEventListener('pause',function(){if(!v.srcObject||!v.srcObject.active)hide()});"
+                + "if(v.srcObject&&v.srcObject.getTracks)v.srcObject.getTracks().forEach(function(t){t.addEventListener('ended',hide)});"
+                + "reveal();}"
+                + "var b=document.getElementById('startBtn');if(b&&!b.dataset.androidPermissionHook){"
+                + "b.dataset.androidPermissionHook='1';b.addEventListener('click',function(){"
+                + "AndroidCamera.cameraButtonPressed()},true);}"
+                + "})();";
+        view.evaluateJavascript(script, null);
+    }
+
+    private boolean isPatriorigenOrigin(Uri uri) {
+        if (uri == null || !"https".equalsIgnoreCase(uri.getScheme())) return false;
+        String host = uri.getHost();
+        return host != null && (host.equalsIgnoreCase("patriorigen.es")
+                || host.equalsIgnoreCase("www.patriorigen.es"));
+    }
+
+    private final class CameraBridge {
+        @JavascriptInterface
+        public void cameraButtonPressed() {
+            if (trustedMainFrame) userCameraTapPending = true;
+        }
+    }
+
+    private void showCameraSettingsDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Permiso de cámara")
+                .setMessage("Android no permite volver a mostrar el permiso. Puedes activarlo en los ajustes de la aplicación o usar el código manual.")
+                .setNegativeButton("Ahora no", (dialog, which) -> { })
+                .setPositiveButton("Abrir ajustes", (dialog, which) -> {
+                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                })
+                .show();
+    }
+
     private void handleWebPermissionRequest(PermissionRequest request) {
         if (!isPatriorigenOrigin(request.getOrigin())
                 || !containsCameraRequest(request.getResources())) {
@@ -213,7 +319,13 @@ public final class MainActivity extends ComponentActivity {
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
                 == PackageManager.PERMISSION_GRANTED) {
+            startupPermissionDenied = false;
+            userCameraTapPending = false;
             grantCameraRequest(request);
+            return;
+        }
+        if (startupPermissionDenied && !userCameraTapPending) {
+            denyCameraRequest(request);
             return;
         }
         if (pendingCameraRequest != null && pendingCameraRequest != request) {

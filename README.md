@@ -1,12 +1,12 @@
 # Patriorigen para Android
 
-Aplicación Android ligera que abre https://patriorigen.es/ en un WebView y conserva la interfaz y las funciones que ofrece la web.
+Aplicación Android que abre https://patriorigen.es/ en un WebView y conserva la interfaz y las funciones de la web.
 
-## Cámara y permisos
+## Cámara
 
-El escáner web usa ZXing y la cámara del navegador. El WebView solicita el permiso de vídeo únicamente para el origen HTTPS de Patriorigen; Android muestra su diálogo de cámara cuando la página intenta iniciar el escáner. Las opciones disponibles y su duración dependen de la versión de Android. Si el permiso queda concedido, se reutiliza; si Android lo revoca, se vuelve a solicitar.
+Al iniciar, Android solicita el permiso de cámara si aún no está concedido. El WebView da acceso de vídeo solo al origen HTTPS de Patriorigen. Si el permiso se rechaza al inicio, el código manual permanece disponible y se puede volver a intentar desde el botón de cámara. Las decisiones de permiso y las opciones de duración las gestiona Android en cada versión.
 
-La entrada de código manual sigue funcionando sin permiso de cámara. La selección o captura de fotos para los reportes usa el selector de imágenes de Android.
+El vídeo de la página permanece oculto hasta que recibe una imagen real de la cámara, para evitar el icono gris del reproductor durante el inicio.
 
 ## Compilación
 
@@ -18,6 +18,4 @@ gradle assembleDebug
 
 El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Proyecto de referencia
-
-Este proyecto es independiente de [patriorigen-geckoview](https://github.com/Lim4/patriorigen-geckoview). El repositorio GeckoView permanece sin cambios.
+El proyecto es independiente de [patriorigen-geckoview](https://github.com/Lim4/patriorigen-geckoview), que permanece sin cambios.
