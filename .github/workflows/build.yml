@@ -43,6 +43,10 @@ jobs:
           done
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/patriorigen-release.jks
       - name: Build release APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           sdkmanager "platforms;android-36" "build-tools;36.0.0"
           gradle assembleRelease
