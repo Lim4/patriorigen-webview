@@ -8,7 +8,28 @@ Descarga la APK de **Patriorigen WebView** desde la [última versión publicada 
 
 La aplicación requiere **Android 8.0 o posterior** (API 26). Para instalarla, abre el archivo APK descargado y confirma la instalación. Android puede pedirte que autorices la instalación desde esa fuente.
 
-Las versiones publicadas aquí son compilaciones de depuración. Si Android no permite actualizar sobre una versión anterior, desinstala la anterior y vuelve a instalar esta; las compilaciones pueden estar firmadas con claves distintas.
+Las APK de las nuevas compilaciones se firman como versión `release` con una clave persistente guardada como secreto de GitHub Actions. Android permite instalarlas encima de una versión anterior si conserva el mismo `applicationId`, la misma clave de firma y un `versionCode` superior. El proyecto conserva `es.patriorigen.webview` y aumenta `versionCode` para cada actualización.
+
+**Migración desde la APK debug actual:** la clave release es distinta de la clave debug. Android no permite cambiar la firma durante una actualización, así que hay que desinstalar la app debug una sola vez e instalar la primera APK release. A partir de ahí, las APK release firmadas con la misma clave se podrán instalar encima, sin desinstalar. La desinstalación inicial borra los datos locales de la aplicación.
+
+## Preparar la firma persistente (una sola vez)
+
+Antes de ejecutar el flujo de Actions, crea una clave privada de firma y guárdala de forma segura fuera del repositorio. No la subas ni la compartas: perderla impide firmar futuras actualizaciones compatibles.
+
+Con JDK 17, genera un almacén de claves:
+
+```sh
+keytool -genkeypair -v -keystore patriorigen-release.jks -alias patriorigen -keyalg RSA -keysize 2048 -validity 10000
+```
+
+En GitHub, abre **Settings → Secrets and variables → Actions → New repository secret** y crea estos cuatro secretos:
+
+- `ANDROID_KEYSTORE_BASE64`: contenido del archivo JKS codificado en Base64 (en PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("patriorigen-release.jks")) | Set-Clipboard`).
+- `ANDROID_KEYSTORE_PASSWORD`: contraseña del almacén.
+- `ANDROID_KEY_ALIAS`: el alias usado al crear la clave (`patriorigen` en el ejemplo).
+- `ANDROID_KEY_PASSWORD`: contraseña de la clave.
+
+No incluyas las contraseñas ni el almacén en el repositorio. El flujo falla con un mensaje claro si faltan secretos, en lugar de generar una APK que no pueda actualizar la versión instalada.
 
 ## Funciones
 
@@ -33,7 +54,7 @@ Consulta la [política de privacidad de Patriorigen](https://patriorigen.es/priv
 
 ### Desde GitHub Actions
 
-El flujo de GitHub Actions compila automáticamente en cada push al repositorio y también se puede iniciar manualmente desde [Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml). Cuando termine correctamente, descarga el artefacto **Patriorigen-WebView-debug** desde la ejecución.
+El flujo de GitHub Actions compila automáticamente en cada push al repositorio y también se puede iniciar manualmente desde [Actions](https://github.com/Lim4/patriorigen-webview/actions/workflows/build.yml). Descarga el artefacto **Patriorigen-WebView-release** desde la ejecución correcta. Asegúrate de haber configurado los cuatro secretos de firma indicados arriba.
 
 ### En local
 
@@ -43,11 +64,7 @@ Se necesita **JDK 17**, **Gradle 8.11.1**, Android SDK Platform **36** y Android
 gradle assembleDebug
 ```
 
-El APK se genera en:
-
-```
-app/build/outputs/apk/debug/app-debug.apk
-```
+Este comando genera una APK debug para desarrollo, que no podrá actualizar la APK release instalada en el móvil. El APK se genera en `app/build/outputs/apk/debug/app-debug.apk`.
 
 Datos principales del proyecto:
 
